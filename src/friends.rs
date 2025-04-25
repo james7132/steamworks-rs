@@ -95,41 +95,55 @@ impl<Manager> Friends<Manager> {
         }
     }
 
-    pub fn get_friends(&self, flags: FriendFlags) -> Vec<Friend<Manager>> {
-        unsafe {
-            let count = sys::SteamAPI_ISteamFriends_GetFriendCount(self.friends, flags.bits() as _);
-            if count == -1 {
-                return Vec::new();
-            }
-            let mut friends = Vec::with_capacity(count as usize);
-            for idx in 0..count {
-                let friend = SteamId(sys::SteamAPI_ISteamFriends_GetFriendByIndex(
-                    self.friends,
-                    idx,
-                    flags.bits() as _,
-                ));
-                friends.push(self.get_friend(friend));
-            }
+    pub fn get_friends(&self, flags: FriendFlags) -> impl Iterator<Item=Friend<Manager>> + '_ {
+        let mut count = 0;
 
-            friends
+        unsafe {
+            let friend_count = sys::SteamAPI_ISteamFriends_GetFriendCount(self.friends, flags.bits() as _);
+            if friend_count == -1 {
+                count = friend_count as usize;
+            }
+        }
+
+        SteamIterator {
+            current_index: 0,
+            count,
+            fetch_fn: move |idx| {
+                let friend_id= unsafe {
+                    sys::SteamAPI_ISteamFriends_GetFriendByIndex(
+                        self.friends,
+                        idx as i32,
+                        flags.bits() as _,
+                    )
+                };
+                Some(self.get_friend(SteamId(friend_id)))
+            }
         }
     }
+
     /// Returns recently played with players list
-    pub fn get_coplay_friends(&self) -> Vec<Friend<Manager>> {
+    pub fn get_coplay_friends(&self) -> impl Iterator<Item=Friend<Manager>> + '_ {
+        let mut count = 0;
+
         unsafe {
-            let count = sys::SteamAPI_ISteamFriends_GetCoplayFriendCount(self.friends);
-            if count == -1 {
-                return Vec::new();
+            let friend_count = sys::SteamAPI_ISteamFriends_GetCoplayFriendCount(self.friends);
+            if friend_count != -1 {
+                count = friend_count as usize;
             }
-            let mut friends = Vec::with_capacity(count as usize);
-            for idx in 0..count {
-                let friend = SteamId(sys::SteamAPI_ISteamFriends_GetCoplayFriend(
-                    self.friends,
-                    idx,
-                ));
-                friends.push(self.get_friend(friend));
+        }
+
+        SteamIterator {
+            current_index: 0,
+            count,
+            fetch_fn: move |idx| {
+                let friend_id = unsafe {
+                    sys::SteamAPI_ISteamFriends_GetCoplayFriend(
+                        self.friends,
+                        idx as i32,
+                    )
+                };
+                Some(self.get_friend(SteamId(friend_id)))
             }
-            friends
         }
     }
 

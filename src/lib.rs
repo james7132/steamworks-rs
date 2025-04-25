@@ -14,6 +14,7 @@ use core::ffi::c_void;
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr, CString};
 use std::fmt::{self, Debug, Formatter};
+use std::iter::FusedIterator;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, Weak};
 
@@ -590,6 +591,31 @@ impl GameId {
         AppId((self.0 & 0xFF_FF_FF) as u32)
     }
 }
+
+pub struct SteamIterator<T, FetchFn: FnMut(usize) -> Option<T>> {
+    current_index: usize,
+    count: usize,
+    fetch_fn: FetchFn,
+}
+
+impl<T, FetchFn: FnMut(usize) -> Option<T>> Iterator for SteamIterator<T, FetchFn> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_index < self.count {
+            let result = (self.fetch_fn)(self.current_index);
+            self.current_index += 1;
+            if result.is_none() {
+                self.current_index = self.count;
+            }
+            result
+        } else {
+            None
+        }
+    }
+}
+
+impl<T, FetchFn: FnMut(usize) -> Option<T>> FusedIterator for SteamIterator<T, FetchFn> {}
 
 #[cfg(test)]
 mod tests {

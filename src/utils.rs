@@ -109,6 +109,7 @@ impl From<FloatingGamepadTextInputMode> for sys::EFloatingGamepadTextInputMode {
 }
 
 /// Global rust warning callback
+#[allow(clippy::type_complexity)]
 static WARNING_CALLBACK: RwLock<Option<Box<dyn Fn(i32, &CStr) + Send + Sync>>> = RwLock::new(None);
 
 /// C function to pass as the real callback, which forwards to the `WARNING_CALLBACK` if any
@@ -313,7 +314,7 @@ impl Drop for SteamParamStringArray {
 impl SteamParamStringArray {
     pub(crate) fn new<S: AsRef<str>>(vec: &[S]) -> SteamParamStringArray {
         SteamParamStringArray(
-            vec.into_iter()
+            vec.iter()
                 .map(|s| {
                     CString::new(s.as_ref())
                         .expect("String passed could not be converted to a c string")
