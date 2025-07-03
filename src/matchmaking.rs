@@ -25,23 +25,26 @@ pub enum LobbyType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct LobbyId(pub(crate) u64);
+pub struct LobbyId(pub(crate) SteamId);
 
 impl LobbyId {
     /// Creates a `LobbyId` from a raw 64 bit value.
     ///
     /// May be useful for deserializing lobby ids from
     /// a network or save format.
+    /// network or to a save format.
+    #[inline]
     pub fn from_raw(id: u64) -> LobbyId {
-        LobbyId(id)
+        LobbyId(SteamId::from_raw(id))
     }
 
     /// Returns the raw 64 bit value of the lobby id
     ///
     /// May be useful for serializing lobby ids over a
     /// network or to a save format.
+    #[inline]
     pub fn raw(&self) -> u64 {
-        self.0
+        self.0.raw()
     }
 }
 
@@ -61,10 +64,12 @@ impl Matchmaking {
                     } else {
                         let mut out = Vec::with_capacity(v.m_nLobbiesMatching as usize);
                         for idx in 0..v.m_nLobbiesMatching {
-                            out.push(LobbyId(sys::SteamAPI_ISteamMatchmaking_GetLobbyByIndex(
-                                sys::SteamAPI_SteamMatchmaking_v009(),
-                                idx as _,
-                            )));
+                            out.push(LobbyId::from_raw(
+                                sys::SteamAPI_ISteamMatchmaking_GetLobbyByIndex(
+                                    sys::SteamAPI_SteamMatchmaking_v009(),
+                                    idx as _,
+                                ),
+                            ));
                         }
                         Ok(out)
                     })
@@ -104,7 +109,8 @@ impl Matchmaking {
                     cb(if io_error {
                         Err(SteamError::IOFailure)
                     } else {
-                        crate::to_steam_result(v.m_eResult).map(|_| LobbyId(v.m_ulSteamIDLobby))
+                        crate::to_steam_result(v.m_eResult)
+                            .map(|_| LobbyId(SteamId::from_raw(v.m_ulSteamIDLobby)))
                     })
                 },
             );
@@ -117,7 +123,7 @@ impl Matchmaking {
         F: FnOnce(Result<LobbyId, ()>) + 'static + Send,
     {
         unsafe {
-            let api_call = sys::SteamAPI_ISteamMatchmaking_JoinLobby(self.mm, lobby.0);
+            let api_call = sys::SteamAPI_ISteamMatchmaking_JoinLobby(self.mm, lobby.raw());
             register_call_result::<sys::LobbyEnter_t, _>(
                 &self.inner,
                 api_call,
@@ -125,7 +131,7 @@ impl Matchmaking {
                     cb(if io_error || v.m_EChatRoomEnterResponse != 1 {
                         Err(())
                     } else {
-                        Ok(LobbyId(v.m_ulSteamIDLobby))
+                        Ok(LobbyId(SteamId::from_raw(v.m_ulSteamIDLobby)))
                     })
                 },
             );
@@ -134,7 +140,7 @@ impl Matchmaking {
 
     /// Returns the number of data keys in the lobby
     pub fn lobby_data_count(&self, lobby: LobbyId) -> u32 {
-        unsafe { sys::SteamAPI_ISteamMatchmaking_GetLobbyDataCount(self.mm, lobby.0) as _ }
+        unsafe { sys::SteamAPI_ISteamMatchmaking_GetLobbyDataCount(self.mm, lobby.raw()) as _ }
     }
 
     /// Returns the lobby metadata associated with the specified key from the
@@ -142,7 +148,8 @@ impl Matchmaking {
     pub fn lobby_data(&self, lobby: LobbyId, key: &str) -> Option<String> {
         let key = CString::new(key).unwrap();
         unsafe {
-            let data = sys::SteamAPI_ISteamMatchmaking_GetLobbyData(self.mm, lobby.0, key.as_ptr());
+            let data =
+                sys::SteamAPI_ISteamMatchmaking_GetLobbyData(self.mm, lobby.raw(), key.as_ptr());
             CStr::from_ptr(data)
         }
         .to_str()
@@ -158,7 +165,7 @@ impl Matchmaking {
         unsafe {
             let success = sys::SteamAPI_ISteamMatchmaking_GetLobbyDataByIndex(
                 self.mm,
-                lobby.0,
+                lobby.raw(),
                 idx as _,
                 key.as_mut_ptr() as _,
                 key.len() as _,
@@ -184,7 +191,7 @@ impl Matchmaking {
         unsafe {
             sys::SteamAPI_ISteamMatchmaking_SetLobbyData(
                 self.mm,
-                lobby.0,
+                lobby.raw(),
                 key.as_ptr(),
                 value.as_ptr(),
             )
@@ -194,7 +201,9 @@ impl Matchmaking {
     /// Deletes the lobby metadata associated with the specified key in the specified lobby.
     pub fn delete_lobby_data(&self, lobby: LobbyId, key: &str) -> bool {
         let key = CString::new(key).unwrap();
-        unsafe { sys::SteamAPI_ISteamMatchmaking_DeleteLobbyData(self.mm, lobby.0, key.as_ptr()) }
+        unsafe {
+            sys::SteamAPI_ISteamMatchmaking_DeleteLobbyData(self.mm, lobby.raw(), key.as_ptr())
+        }
     }
 
     /// Sets per-user metadata for the local user.
@@ -206,7 +215,7 @@ impl Matchmaking {
         unsafe {
             sys::SteamAPI_ISteamMatchmaking_SetLobbyMemberData(
                 self.mm,
-                lobby.0,
+                lobby.raw(),
                 key.as_ptr(),
                 value.as_ptr(),
             )
@@ -227,7 +236,7 @@ impl Matchmaking {
         unsafe {
             let data = sys::SteamAPI_ISteamMatchmaking_GetLobbyMemberData(
                 self.mm,
-                lobby.0,
+                lobby.raw(),
                 user.0,
                 key.as_ptr(),
             );
@@ -241,7 +250,7 @@ impl Matchmaking {
     /// Exits the passed lobby
     pub fn leave_lobby(&self, lobby: LobbyId) {
         unsafe {
-            sys::SteamAPI_ISteamMatchmaking_LeaveLobby(self.mm, lobby.0);
+            sys::SteamAPI_ISteamMatchmaking_LeaveLobby(self.mm, lobby.raw());
         }
     }
 
@@ -250,7 +259,7 @@ impl Matchmaking {
     /// Returns `[None]` if no metadata is available for the specified lobby.
     pub fn lobby_member_limit(&self, lobby: LobbyId) -> Option<usize> {
         unsafe {
-            let count = sys::SteamAPI_ISteamMatchmaking_GetLobbyMemberLimit(self.mm, lobby.0);
+            let count = sys::SteamAPI_ISteamMatchmaking_GetLobbyMemberLimit(self.mm, lobby.raw());
             match count {
                 0 => None,
                 _ => Some(count as usize),
@@ -261,8 +270,9 @@ impl Matchmaking {
     /// Returns the steam id of the current owner of the passed lobby
     pub fn lobby_owner(&self, lobby: LobbyId) -> SteamId {
         unsafe {
-            SteamId(sys::SteamAPI_ISteamMatchmaking_GetLobbyOwner(
-                self.mm, lobby.0,
+            SteamId::from_raw(sys::SteamAPI_ISteamMatchmaking_GetLobbyOwner(
+                self.mm,
+                lobby.raw(),
             ))
         }
     }
@@ -272,7 +282,7 @@ impl Matchmaking {
     /// Useful if you are not currently in the lobby
     pub fn lobby_member_count(&self, lobby: LobbyId) -> usize {
         unsafe {
-            let count = sys::SteamAPI_ISteamMatchmaking_GetNumLobbyMembers(self.mm, lobby.0);
+            let count = sys::SteamAPI_ISteamMatchmaking_GetNumLobbyMembers(self.mm, lobby.raw());
             count as usize
         }
     }
@@ -280,11 +290,15 @@ impl Matchmaking {
     /// Returns a list of members currently in the lobby
     pub fn lobby_members(&self, lobby: LobbyId) -> Vec<SteamId> {
         unsafe {
-            let count = sys::SteamAPI_ISteamMatchmaking_GetNumLobbyMembers(self.mm, lobby.0);
+            let count = sys::SteamAPI_ISteamMatchmaking_GetNumLobbyMembers(self.mm, lobby.raw());
             let mut members = Vec::with_capacity(count as usize);
             for idx in 0..count {
                 members.push(SteamId(
-                    sys::SteamAPI_ISteamMatchmaking_GetLobbyMemberByIndex(self.mm, lobby.0, idx),
+                    sys::SteamAPI_ISteamMatchmaking_GetLobbyMemberByIndex(
+                        self.mm,
+                        lobby.raw(),
+                        idx,
+                    ),
                 ))
             }
             members
@@ -301,7 +315,7 @@ impl Matchmaking {
     ///
     /// Returns true on success, false if the current user doesn't own the lobby.
     pub fn set_lobby_joinable(&self, lobby: LobbyId, joinable: bool) -> bool {
-        unsafe { sys::SteamAPI_ISteamMatchmaking_SetLobbyJoinable(self.mm, lobby.0, joinable) }
+        unsafe { sys::SteamAPI_ISteamMatchmaking_SetLobbyJoinable(self.mm, lobby.raw(), joinable) }
     }
 
     /// Broadcasts a chat message (text or binary data) to all users in the lobby.
@@ -334,7 +348,7 @@ impl Matchmaking {
         match unsafe {
             steamworks_sys::SteamAPI_ISteamMatchmaking_SendLobbyChatMsg(
                 self.mm,
-                lobby.0,
+                lobby.raw(),
                 msg.as_ptr().cast(),
                 msg.len() as i32,
             )
@@ -360,14 +374,12 @@ impl Matchmaking {
         chat_id: i32,
         buffer: &'a mut [u8],
     ) -> &'a [u8] {
-        let mut steam_user = sys::CSteamID {
-            m_steamid: sys::CSteamID_SteamID_t { m_unAll64Bits: 0 },
-        };
-        let mut chat_type = steamworks_sys::EChatEntryType::k_EChatEntryTypeInvalid;
+        let mut steam_user = SteamId::from_raw(0).to_sys();
+        let mut chat_type = sys::EChatEntryType::k_EChatEntryTypeInvalid;
         unsafe {
             let len = sys::SteamAPI_ISteamMatchmaking_GetLobbyChatEntry(
                 self.mm,
-                lobby.0,
+                lobby.raw(),
                 chat_id,
                 &mut steam_user,
                 buffer.as_mut_ptr().cast(),
@@ -590,7 +602,7 @@ impl Matchmaking {
         unsafe {
             sys::SteamAPI_ISteamMatchmaking_SetLobbyGameServer(
                 self.mm,
-                lobby.0,
+                lobby.raw(),
                 server_addr.ip().to_bits(),
                 server_addr.port(),
                 server_steam_id.map(|id| id.0).unwrap_or(0),
@@ -612,20 +624,18 @@ impl Matchmaking {
             let mut server_ip = 0;
             let mut server_port = 0;
 
-            let mut server_steam_id = sys::CSteamID {
-                m_steamid: sys::CSteamID_SteamID_t { m_unAll64Bits: 0 },
-            };
+            let mut server_steam_id = SteamId::from_raw(0).to_sys();
 
             let success = sys::SteamAPI_ISteamMatchmaking_GetLobbyGameServer(
                 self.mm,
-                lobby.0,
+                lobby.raw(),
                 &mut server_ip,
                 &mut server_port,
                 &mut server_steam_id,
             );
 
             let server_addr = SocketAddrV4::new(Ipv4Addr::from_bits(server_ip), server_port);
-            let server_id = SteamId::from_raw(server_steam_id.m_steamid.m_unAll64Bits);
+            let server_id = SteamId::from_sys(server_steam_id);
 
             // Return None if no game server is associated with the lobby
             let server_id = (!server_id.is_invalid()).then_some(server_id);
@@ -1100,7 +1110,7 @@ pub struct LobbyChatMsg {
 
 impl_callback!(cb: LobbyChatMsg_t => LobbyChatMsg {
     Self {
-        lobby: LobbyId(cb.m_ulSteamIDLobby),
+        lobby: LobbyId(SteamId::from_raw(cb.m_ulSteamIDLobby)),
         user: SteamId(cb.m_ulSteamIDUser),
         chat_entry_type: cb.m_eChatEntryType.into(),
         chat_id: cb.m_iChatID as i32,
@@ -1123,7 +1133,7 @@ pub struct LobbyChatUpdate {
 
 impl_callback!(cb: LobbyChatUpdate_t => LobbyChatUpdate {
     Self {
-        lobby: LobbyId(cb.m_ulSteamIDLobby),
+        lobby: LobbyId(SteamId::from_raw(cb.m_ulSteamIDLobby)),
         user_changed: SteamId(cb.m_ulSteamIDUserChanged),
         making_change: SteamId(cb.m_ulSteamIDUserChanged),
         member_state_change: match cb.m_rgfChatMemberStateChange {
@@ -1162,7 +1172,7 @@ pub struct LobbyCreated {
 impl_callback!(cb: LobbyCreated_t => LobbyCreated {
     Self {
         result: cb.m_eResult as u32,
-        lobby: LobbyId(cb.m_ulSteamIDLobby),
+        lobby: LobbyId(SteamId::from_raw(cb.m_ulSteamIDLobby)),
     }
 });
 
@@ -1181,7 +1191,7 @@ pub struct LobbyDataUpdate {
 
 impl_callback!(cb: LobbyDataUpdate_t => LobbyDataUpdate {
     Self {
-        lobby: LobbyId(cb.m_ulSteamIDLobby),
+        lobby: LobbyId(SteamId::from_raw(cb.m_ulSteamIDLobby)),
         member: SteamId(cb.m_ulSteamIDMember),
         success: cb.m_bSuccess != 0,
     }
@@ -1203,7 +1213,7 @@ pub struct LobbyEnter {
 
 impl_callback!(cb: LobbyEnter_t => LobbyEnter {
     Self {
-        lobby: LobbyId(cb.m_ulSteamIDLobby),
+        lobby: LobbyId(SteamId(cb.m_ulSteamIDLobby)),
         chat_permissions: cb.m_rgfChatPermissions,
         blocked: cb.m_bLocked,
         chat_room_enter_response: cb.m_EChatRoomEnterResponse.into(),

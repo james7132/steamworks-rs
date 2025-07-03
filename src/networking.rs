@@ -141,7 +141,7 @@ pub struct P2PSessionRequest {
 
 impl_callback!(cb: P2PSessionRequest_t => P2PSessionRequest {
     Self {
-        remote: SteamId(cb.m_steamIDRemote.m_steamid.m_unAll64Bits),
+        remote: SteamId::from_sys(cb.m_steamIDRemote),
     }
 });
 
@@ -154,7 +154,7 @@ pub struct P2PSessionConnectFail {
 
 impl_callback!(cb: P2PSessionConnectFail_t => P2PSessionConnectFail {
     Self {
-        remote: SteamId(cb.m_steamIDRemote.m_steamid.m_unAll64Bits),
+        remote: SteamId::from_sys(cb.m_steamIDRemote),
         error: cb.m_eP2PSessionError,
     }
 });

@@ -201,7 +201,7 @@ impl UserStats {
                             details.set_len(entry.m_cDetails as usize);
 
                             entries.push(LeaderboardEntry {
-                                user: SteamId(entry.m_steamIDUser.m_steamid.m_unAll64Bits),
+                                user: SteamId::from_sys(entry.m_steamIDUser),
                                 global_rank: entry.m_nGlobalRank,
                                 score: entry.m_nScore,
                                 details,

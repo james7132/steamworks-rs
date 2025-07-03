@@ -316,8 +316,8 @@ pub struct ValidateAuthTicketResponse {
 
 impl_callback!(cb: ValidateAuthTicketResponse_t => ValidateAuthTicketResponse {
     Self {
-        steam_id: SteamId(cb.m_SteamID.m_steamid.m_unAll64Bits),
-        owner_steam_id: SteamId(cb.m_OwnerSteamID.m_steamid.m_unAll64Bits),
+        steam_id: SteamId::from_sys(cb.m_SteamID),
+        owner_steam_id: SteamId::from_sys(cb.m_OwnerSteamID),
         response: match cb.m_eAuthSessionResponse {
             sys::EAuthSessionResponse::k_EAuthSessionResponseOK => Ok(()),
             sys::EAuthSessionResponse::k_EAuthSessionResponseUserNotConnectedToSteam => {

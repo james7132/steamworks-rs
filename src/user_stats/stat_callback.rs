@@ -23,7 +23,7 @@ pub struct UserStatsReceived {
 
 impl_callback!(cb: UserStatsReceived_t => UserStatsReceived {
     Self {
-        steam_id: SteamId(cb.m_steamIDUser.m_steamid.m_unAll64Bits),
+        steam_id: SteamId::from_sys(cb.m_steamIDUser),
         game_id: GameId(cb.m_nGameID),
         result: crate::to_steam_result(cb.m_eResult),
     }

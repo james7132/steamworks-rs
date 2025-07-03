@@ -573,13 +573,30 @@ impl Drop for ClientManager {
 /// A user's steam id
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct SteamId(pub(crate) u64);
+pub struct SteamId(u64);
 
 impl SteamId {
+    #[inline]
+    pub(crate) fn from_sys(value: sys::CSteamID) -> Self {
+        // SAFETY: The u64 representation is always valid. The C side union exists for extracting
+        // bitwise components out.
+        unsafe { Self(value.m_steamid.m_unAll64Bits) }
+    }
+
+    #[inline]
+    pub(crate) fn to_sys(self) -> sys::CSteamID {
+        sys::CSteamID {
+            m_steamid: sys::CSteamID_SteamID_t {
+                m_unAll64Bits: self.0,
+            },
+        }
+    }
+
     /// Creates a `SteamId` from a raw 64 bit value.
     ///
     /// May be useful for deserializing steam ids from
     /// a network or save format.
+    #[inline]
     pub fn from_raw(id: u64) -> SteamId {
         SteamId(id)
     }
@@ -588,6 +605,7 @@ impl SteamId {
     ///
     /// May be useful for serializing steam ids over a
     /// network or to a save format.
+    #[inline]
     pub fn raw(&self) -> u64 {
         self.0
     }

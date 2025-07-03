@@ -181,6 +181,7 @@ pub struct GameServerItem {
     pub ping: Duration,
     pub max_players: i32,
     pub server_version: i32,
+    // TODO: Convert
     pub steamid: u64,
     pub last_time_played: Duration,
     pub addr: Ipv4Addr,
@@ -203,7 +204,7 @@ impl GameServerItem {
             ping: Duration::from_millis(raw.m_nPing.try_into().unwrap()),
             max_players: raw.m_nMaxPlayers,
             server_version: raw.m_nServerVersion,
-            steamid: raw.m_steamID.m_steamid.m_unAll64Bits,
+            steamid: SteamId::from_sys(raw.m_steamID).raw(),
 
             do_not_refresh: raw.m_bDoNotRefresh,
             successful_response: raw.m_bHadSuccessfulResponse,

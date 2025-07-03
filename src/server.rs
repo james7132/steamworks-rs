@@ -684,8 +684,8 @@ pub struct GSClientApprove {
 
 impl_callback!(cb: GSClientApprove_t => GSClientApprove {
     Self {
-        user: SteamId(cb.m_SteamID.m_steamid.m_unAll64Bits),
-        owner: SteamId(cb.m_OwnerSteamID.m_steamid.m_unAll64Bits),
+        user: SteamId::from_sys(cb.m_SteamID),
+        owner: SteamId::from_sys(cb.m_OwnerSteamID),
     }
 });
 
@@ -753,7 +753,7 @@ impl_callback!(cb: GSClientDeny_t => GSClientDeny {
     };
 
     GSClientDeny {
-        user: SteamId(cb.m_SteamID.m_steamid.m_unAll64Bits),
+        user: SteamId::from_sys(cb.m_SteamID),
         deny_reason: DenyReason::from(cb.m_eDenyReason),
         optional_text: deny_text,
     }
@@ -770,7 +770,7 @@ pub struct GSClientKick {
 
 impl_callback!(cb: GSClientKick_t => GSClientKick {
     Self {
-        user: SteamId(cb.m_SteamID.m_steamid.m_unAll64Bits),
+        user: SteamId::from_sys(cb.m_SteamID),
         deny_reason: DenyReason::from(cb.m_eDenyReason),
     }
 });
@@ -788,8 +788,8 @@ pub struct GSClientGroupStatus {
 
 impl_callback!(cb: GSClientGroupStatus_t => GSClientGroupStatus {
     Self {
-        user: SteamId(cb.m_SteamIDUser.m_steamid.m_unAll64Bits),
-        group: SteamId(cb.m_SteamIDGroup.m_steamid.m_unAll64Bits),
+        user: SteamId::from_sys(cb.m_SteamIDUser),
+        group: SteamId::from_sys(cb.m_SteamIDGroup),
         member: cb.m_bMember,
         officer: cb.m_bOfficer,
     }

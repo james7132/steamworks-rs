@@ -176,7 +176,7 @@ impl Friends {
     /// Opens up an invite dialog for the given lobby
     pub fn activate_invite_dialog(&self, lobby: LobbyId) {
         unsafe {
-            sys::SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialog(self.friends, lobby.0);
+            sys::SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialog(self.friends, lobby.raw());
         }
     }
 
@@ -251,8 +251,8 @@ pub struct GameLobbyJoinRequested {
 
 impl_callback!(cb: GameLobbyJoinRequested_t => GameLobbyJoinRequested {
     Self {
-        lobby_steam_id: LobbyId(cb.m_steamIDLobby.m_steamid.m_unAll64Bits),
-        friend_steam_id: SteamId(cb.m_steamIDFriend.m_steamid.m_unAll64Bits),
+        lobby_steam_id: LobbyId(SteamId::from_sys(cb.m_steamIDLobby)),
+        friend_steam_id: SteamId::from_sys(cb.m_steamIDFriend),
     }
 });
 
@@ -278,10 +278,8 @@ impl_callback!(cb: GameRichPresenceJoinRequested_t => GameRichPresenceJoinReques
         .expect("Connect string payload was not valid UTF-8")
         .to_string();
 
-    let friend_steam_id = SteamId::from_raw(cb.m_steamIDFriend.m_steamid.m_unAll64Bits);
-
     GameRichPresenceJoinRequested {
-        friend_steam_id,
+        friend_steam_id: SteamId::from_sys(cb.m_steamIDFriend),
         connect,
     }
 });
@@ -353,7 +351,7 @@ impl Friend {
                     game_address: info.m_unGameIP.into(),
                     game_port: info.m_usGamePort,
                     query_port: info.m_usQueryPort,
-                    lobby: LobbyId(info.m_steamIDLobby.m_steamid.m_unAll64Bits),
+                    lobby: LobbyId(SteamId::from_sys(info.m_steamIDLobby)),
                 })
             } else {
                 None
